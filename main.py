@@ -1,6 +1,13 @@
-from fastapi import FastAPI
+from fastapi import FastAPI,Request
 from app.config import Settings
 from app.routers import items
+import logging,time
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s | %(levelname)s | %(name)s | %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 settings = Settings()
 app = FastAPI(
@@ -13,14 +20,31 @@ app = FastAPI(
     }
 )
 
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    start_time = time.time()
+    logger.info("Входящий запрос: %s %s", request.method, request.url.path)
+    response = await call_next(request)
+    duration = time.time() - start_time
+    logger.info(
+        "Запрос завершён: %s %s -> статус %s (%.3f сек)",
+        request.method,
+        request.url.path,
+        response.status_code,
+        duration,
+    )
+    return response
+
 app.include_router(items.router)
 
 @app.get("/")
 def read_root():
+    logger.info("Обращение к корневому маршруту /")
     return {"message": "Hello, FastAPI!"}
 
 @app.get("/info")
 def info():
+    logger.info("Запрос информации о приложении /info")
     return {
         "app_name": settings.app_name,
         "admin_email": settings.admin_email,
